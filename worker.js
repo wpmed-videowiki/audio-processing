@@ -31,7 +31,7 @@ amqp.connect(process.env.RABBITMQ_HOST_URL, (err, conn) => {
     channel.assertQueue(PROCESS_AUDIO_FINISHED_QUEUE, { durable: true });
     channel.consume(PROCESS_AUDIO_QUEUE, processAudioCallback, { noAck: false });
 
-    ch.sendToQueue(PROCESS_AUDIO_QUEUE, new Buffer(JSON.stringify({ humanvoiceId: '5ccc3dc303e14d25df136f3d', audioPosition: 0 })))
+    // ch.sendToQueue(PROCESS_AUDIO_QUEUE, new Buffer(JSON.stringify({ humanvoiceId: "5ccc3dc303e14d25df136f3d", audioPosition: 0 })))
   })
 })
 
@@ -82,6 +82,13 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
             return cb(null, outputPath)
           })
         },
+        (trimmedPath, cb) => {
+          audioProcessor.compressAudioFile(trimmedPath, (err, compressedPath) => {
+            if (err) return callback(null, trimmedPath);
+            fs.unlink(trimmedPath, () => {});
+            return cb(null, compressedPath);
+          })
+        }
       ];
       
       async.waterfall(processingStepsFunc, (err, finalFilePath) => {

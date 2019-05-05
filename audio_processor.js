@@ -7,12 +7,12 @@ function trimSilenceFromAudio(filePath, callback = (err, outputPath) => {}) {
     const tmpPath = path.join('tmp', `tmpAudio-${Date.now()}.${fileExtension}`);
     const targetPath = path.join('tmp', `silenced-${Date.now()}.${fileExtension}`);
 
-    exec(`sox ${filePath} ${tmpPath} silence -l 1 0.1 1% -1 2.0 1% reverse`, (err, stdout, stderr) => {
+    exec(`sox ${filePath} ${tmpPath} silence -l 1 0.1 1% reverse`, (err, stdout, stderr) => {
         if (err || !fs.existsSync(tmpPath)) {
             fs.unlink(tmpPath, () => {});
             return callback(err);
         }
-        exec(`sox ${tmpPath} ${targetPath} silence -l 1 0.1 1% -1 2.0 1% reverse`, (err, stdout, stderr) => {
+        exec(`sox ${tmpPath} ${targetPath} silence -l 1 0.1 1% reverse`, (err, stdout, stderr) => {
             fs.unlink(tmpPath, () => {});
             if (err || !fs.existsSync(targetPath)) {
                 fs.unlink(targetPath, () => {});
@@ -23,8 +23,18 @@ function trimSilenceFromAudio(filePath, callback = (err, outputPath) => {}) {
     })
 }
 
+function compressAudioFile(filePath, callback) {
+    const fileExtension = filePath.split('.').pop();
+    const targetPath = path.join('tmp', `tiny-${Date.now()}.${fileExtension}`);
+    exec(`sox ${filePath} ${targetPath} remix 1`, (err, stdout, stderr) => {
+        if (err || !fs.existsSync(targetPath)) return callback(err);
+        return callback(null, targetPath);
+    });
+}
+
 module.exports = {
     trimSilenceFromAudio,
+    compressAudioFile,
 }
 
 
