@@ -3,7 +3,7 @@ const path = require('path');
 const request = require('request');
 const AWS = require('aws-sdk');
 
-const BUCKET_NAME = 'vwpmedia';
+const BUCKET_NAME = 'vwaudioprocessor';
 const REGION = 'eu-west-1';
 const CLOUDFRONT_BASE_URL = process.env.CLOUDFRONT_URL;
 
@@ -41,7 +41,7 @@ function uploadToS3(filePath, callback) {
     if (err) {
       return callback(err);
     }
-    const url = `${CLOUDFRONT_BASE_URL}/${fileName}`;
+    const url = `//s3-${REGION}.amazonaws.com/${BUCKET_NAME}/${fileName}`;
 
     return callback(null, { url, ETag: res.ETag, Key: fileName });
   })

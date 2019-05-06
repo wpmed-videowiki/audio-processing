@@ -10,8 +10,8 @@ const HumanVoiceModel = require('./models/HumanVoice');
 const args = process.argv.slice(2);
 const lang = args[0];
 
-const PROCESS_AUDIO_QUEUE = `PROCESS_AUDIO_QUEUE_${lang}`;
-const PROCESS_AUDIO_FINISHED_QUEUE = `PROCESS_AUDIO_FINISHED_QUEUE_${lang}`;
+const PROCESS_HUMANVOICE_AUDIO_QUEUE = `PROCESS_HUMANVOICE_AUDIO_QUEUE_${lang}`;
+const PROCESS_HUMANVOICE_AUDIO_FINISHED_QUEUE = `PROCESS_HUMANVOICE_AUDIO_FINISHED_QUEUE_${lang}`;
 
 const DB_CONNECTION = `${process.env.DB_HOST_URL}-${lang}`;
 // const DB_CONNECTION = 'mongodb://localhost/videowiki-en'
@@ -24,14 +24,17 @@ amqp.connect(process.env.RABBITMQ_HOST_URL, (err, conn) => {
     }
 
   conn.createChannel((err, ch) => {
+    if (err) {
+      console.log('Error creating conection ', err);
+      return process.exit(1);
+    }
+    console.log('connection created')
     channel = ch;
     channel.prefetch(1);
-    console.log('connection created')
-    channel.assertQueue(PROCESS_AUDIO_QUEUE, { durable: true });
-    channel.assertQueue(PROCESS_AUDIO_FINISHED_QUEUE, { durable: true });
-    channel.consume(PROCESS_AUDIO_QUEUE, processAudioCallback, { noAck: false });
-
+    channel.assertQueue(PROCESS_HUMANVOICE_AUDIO_QUEUE, { durable: true });
+    channel.assertQueue(PROCESS_HUMANVOICE_AUDIO_FINISHED_QUEUE, { durable: true });
     // ch.sendToQueue(PROCESS_AUDIO_QUEUE, new Buffer(JSON.stringify({ humanvoiceId: "5ccc3dc303e14d25df136f3d", audioPosition: 0 })))
+    channel.consume(PROCESS_HUMANVOICE_AUDIO_QUEUE, processAudioCallback, { noAck: false });
   })
 })
 
@@ -40,13 +43,20 @@ function processAudioCallback(msg) {
     const { humanvoiceId, audioPosition } = JSON.parse(msg.content.toString());
 
     processAudio(humanvoiceId, audioPosition, (err, result) => {
+      let response = {
+        humanvoiceId,
+        audioPosition,
+        success: false,
+      };
+
       if (err) {
         console.log('error processing audio', err);
         updateAudioStatus(humanvoiceId, audioPosition, { status: 'process_failed', processing: false });
       } else if (result && result.success) {
-        channel.sendToQueue(PROCESS_AUDIO_FINISHED_QUEUE, new Buffer(JSON.stringify({ humanvoiceId, audioPosition })));
+        response.success = true;
       }
-      console.log('Final result', err, result);
+
+      channel.sendToQueue(PROCESS_HUMANVOICE_AUDIO_FINISHED_QUEUE, new Buffer(JSON.stringify(response)));
       channel.ack(msg);
     });
 }
