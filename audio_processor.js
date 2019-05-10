@@ -2,20 +2,20 @@ const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-function trimSilenceFromAudio(filePath, callback = (err, outputPath) => {}) {
+function trimSilenceFromAudio(filePath, callback = (err, outputPath) => { }) {
     const fileExtension = filePath.split('.').pop();
     const tmpPath = path.join('tmp', `tmpAudio-${Date.now()}.${fileExtension}`);
     const targetPath = path.join('tmp', `silenced-${Date.now()}.${fileExtension}`);
 
     exec(`sox ${filePath} ${tmpPath} silence -l 1 0.1 1% reverse`, (err, stdout, stderr) => {
         if (err || !fs.existsSync(tmpPath)) {
-            fs.unlink(tmpPath, () => {});
+            fs.unlink(tmpPath, () => { });
             return callback(err);
         }
         exec(`sox ${tmpPath} ${targetPath} silence -l 1 0.1 1% reverse`, (err, stdout, stderr) => {
-            fs.unlink(tmpPath, () => {});
+            fs.unlink(tmpPath, () => { });
             if (err || !fs.existsSync(targetPath)) {
-                fs.unlink(targetPath, () => {});
+                fs.unlink(targetPath, () => { });
                 return callback(err);
             }
             return callback(null, targetPath);
@@ -32,9 +32,19 @@ function compressAudioFile(filePath, callback) {
     });
 }
 
+function convertToWav(filePath, callback) {
+    const outputPath = path.join(__dirname, 'tmp', `converted_${Date.now()}.wav`);
+
+    exec(`ffmpeg -i ${filePath} ${outputPath}`, (err, stdout, stderr) => {
+        if (err) return callback(err);
+        return callback(null, outputPath);
+    })
+}
+
 module.exports = {
     trimSilenceFromAudio,
     compressAudioFile,
+    convertToWav,
 }
 
 

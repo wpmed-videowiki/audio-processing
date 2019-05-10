@@ -19,7 +19,7 @@ function getRemoteFile(url, callback) {
   request
     .get(url)
     .on('error', (err) => {
-      throw (err)
+      callback(err)
     })
     .pipe(fs.createWriteStream(filePath))
     .on('error', (err) => {

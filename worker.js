@@ -56,12 +56,14 @@ function processAudioCallback(msg) {
         response.success = true;
       }
 
+      console.log('acked')
       channel.sendToQueue(PROCESS_HUMANVOICE_AUDIO_FINISHED_QUEUE, new Buffer(JSON.stringify(response)));
       channel.ack(msg);
     });
 }
 
 function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
+  console.log('starting for file', humanvoiceId, audioPosition);
   HumanVoiceModel.findById(humanvoiceId, (err, humanvoice) => {
     if (!humanvoice) {
         return callback(new Error('Invalid human voice id'));
@@ -74,7 +76,7 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
     updateAudioStatus(humanvoiceId, audioIndex, { processing: true });
 
     const audioItem = humanvoice.audios[audioIndex];
-    const audioURL = audioItem.audioURL.indexOf('https') === -1 ? `https:${audioItem.audioURL}` : audioItem.audioURL;
+    const audioURL = audioItem.audioURL.indexOf('https') === -1 ? `http:${audioItem.audioURL}` : audioItem.audioURL;
     console.log('audio url', audioURL); 
     utils.getRemoteFile(audioURL, (err, filePath) => {
       if (err) {
@@ -83,7 +85,20 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
       
       const processingStepsFunc = [
         (cb) => {
-          console.log('processing');
+          const fileExtension = filePath.split('.').pop().toLowerCase();
+          if (fileExtension === 'mp3' || fileExtension === 'wav') return cb(null, filePath);
+          console.log('converint to wav');
+          audioProcessor.convertToWav(filePath, (err, outputPath) => {
+            if (err) {
+              console.log(err);
+              return cb(null, filePath);
+            }
+            fs.unlink(filePath, () => {})
+            return cb(null, outputPath);
+          })
+        },
+        (filePath, cb) => {
+          console.log('processing', filePath);
           audioProcessor.trimSilenceFromAudio(filePath, (err, outputPath) => {
             fs.unlinkSync(filePath, () => {});
             if (err) {
@@ -93,6 +108,7 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
           })
         },
         (trimmedPath, cb) => {
+          console.log('compressing ')
           audioProcessor.compressAudioFile(trimmedPath, (err, compressedPath) => {
             if (err) return callback(null, trimmedPath);
             fs.unlink(trimmedPath, () => {});
@@ -102,7 +118,7 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
       ];
       
       async.waterfall(processingStepsFunc, (err, finalFilePath) => {
-        console.log('Processed succesfully', err, finalFilePath);
+        console.log('Processed succesfully', err, audioURL, finalFilePath);
         if (err || !fs.existsSync(finalFilePath)) return callback(err);
         
         utils.uploadToS3(finalFilePath, (err, result) => {
@@ -114,12 +130,13 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
             [`audios.${audioIndex}.audioURL`]: result.url,
             [`audios.${audioIndex}.Key`]: result.Key,
           }
+          console.log('uploaded')
           HumanVoiceModel.findByIdAndUpdate(humanvoiceId, { $set: updateObj }, { new: true }, (err, res) => {
             if (err) return callback(err);
             // Delete old audio file
-            utils.deleteFromS3(audioItem.Key, () => {
+            // utils.deleteFromS3(audioItem.Key, () => {
               
-            })
+            // })
             return callback(null, { success: true, humanvoice: res });
           })
         })
