@@ -77,7 +77,6 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
 
     const audioItem = humanvoice.audios[audioIndex];
     const audioURL = audioItem.audioURL.indexOf('https') === -1 ? `http:${audioItem.audioURL}` : audioItem.audioURL;
-    console.log('audio url', audioURL); 
     utils.getRemoteFile(audioURL, (err, filePath) => {
       if (err) {
         return callback(err);
@@ -99,7 +98,7 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
         },
         (filePath, cb) => {
           console.log('processing', filePath);
-          audioProcessor.trimSilenceFromAudio(filePath, (err, outputPath) => {
+          audioProcessor.clearBackgroundNoise(filePath, (err, outputPath) => {
             fs.unlinkSync(filePath, () => {});
             if (err) {
               return cb(err);
@@ -107,18 +106,18 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
             return cb(null, outputPath)
           })
         },
-        (trimmedPath, cb) => {
-          console.log('compressing ')
-          audioProcessor.compressAudioFile(trimmedPath, (err, compressedPath) => {
-            if (err) return callback(null, trimmedPath);
-            fs.unlink(trimmedPath, () => {});
-            return cb(null, compressedPath);
-          })
-        }
+        // (trimmedPath, cb) => {
+        //   console.log('compressing ')
+        //   audioProcessor.compressAudioFile(trimmedPath, (err, compressedPath) => {
+        //     if (err) return callback(null, trimmedPath);
+        //     fs.unlink(trimmedPath, () => {});
+        //     return cb(null, compressedPath);
+        //   })
+        // }
       ];
       
       async.waterfall(processingStepsFunc, (err, finalFilePath) => {
-        console.log('Processed succesfully', err, audioURL, finalFilePath);
+        console.log('Processed succesfully', err, audioURL);
         if (err || !fs.existsSync(finalFilePath)) return callback(err);
         
         utils.uploadToS3(finalFilePath, (err, result) => {
@@ -130,7 +129,7 @@ function processAudio(humanvoiceId, audioPosition, callback = () => {}) {
             [`audios.${audioIndex}.audioURL`]: result.url,
             [`audios.${audioIndex}.Key`]: result.Key,
           }
-          console.log('uploaded')
+          console.log('uploaded', result.url)
           HumanVoiceModel.findByIdAndUpdate(humanvoiceId, { $set: updateObj }, { new: true }, (err, res) => {
             if (err) return callback(err);
             // Delete old audio file

@@ -2,24 +2,48 @@ const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
+const babblelabs =require('./babblelabs');
+const BABBLELABS_USERNAME = process.env.BABBLELABS_USERNAME;
+const BABBLELABS_PASSWORD = process.env.BABBLELABS_PASSWORD;
+
 function trimSilenceFromAudio(filePath, callback = (err, outputPath) => { }) {
     const fileExtension = filePath.split('.').pop();
     const tmpPath = path.join('tmp', `tmpAudio-${Date.now()}.${fileExtension}`);
     const targetPath = path.join('tmp', `silenced-${Date.now()}.${fileExtension}`);
 
-    exec(`sox ${filePath} ${tmpPath} silence -l 1 0.1 1% reverse`, (err, stdout, stderr) => {
-        if (err || !fs.existsSync(tmpPath)) {
-            fs.unlink(tmpPath, () => { });
+    exec(`sox ${filePath} ${targetPath} silence -l 1 0.1 1% -1 2.0 1%`, (err, stdout, stderr) => {
+        if (err || !fs.existsSync(targetPath)) { 
+            // fs.unlink(tmpPath, () => { });
             return callback(err);
         }
-        exec(`sox ${tmpPath} ${targetPath} silence -l 1 0.1 1% reverse`, (err, stdout, stderr) => {
-            fs.unlink(tmpPath, () => { });
-            if (err || !fs.existsSync(targetPath)) {
-                fs.unlink(targetPath, () => { });
-                return callback(err);
-            }
-            return callback(null, targetPath);
-        })
+        return callback(null, targetPath);
+        // exec(`sox ${tmpPath} ${targetPath} silence -l 1 0.1 1% reverse`, (err, stdout, stderr) => {
+        //     fs.unlink(tmpPath, () => { });
+        //     if (err || !fs.existsSync(targetPath)) {
+        //         fs.unlink(targetPath, () => { });
+        //         return callback(err);
+        //     }
+        //     return callback(null, targetPath);
+        // })
+    })
+}
+
+function clearBackgroundNoise(filePath, callback = (err, outputPath) => {}) {
+    const fileExtension = filePath.split('.').pop();
+    const targetPath = path.join('tmp', `cleared-${Date.now()}.${fileExtension}`);
+
+    babblelabs
+    .login(BABBLELABS_USERNAME, BABBLELABS_PASSWORD)
+    .then((res) => {
+        const { token_type, auth_token } = res;
+        const token = `${token_type} ${auth_token}`;
+        return babblelabs.clearAudio(token, BABBLELABS_USERNAME, filePath, targetPath);
+    })
+    .then((res) => {
+        return callback(null, targetPath);
+    })
+    .catch((err) => {
+        return callback(err);
     })
 }
 
@@ -42,6 +66,7 @@ function convertToWav(filePath, callback) {
 }
 
 module.exports = {
+    clearBackgroundNoise,
     trimSilenceFromAudio,
     compressAudioFile,
     convertToWav,
