@@ -7,6 +7,7 @@ const BASE_URL = 'https://api.babblelabs.com';
 function login(userId, password) {
     return new Promise((resolve, reject) => {
 
+        if (!userId || !password) return reject(new Error('Invalid email or password'));
         const body = {
             userId,
             password,
