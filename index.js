@@ -12,7 +12,7 @@ APP_DIRS.forEach(dir => {
 
 
 langs.forEach(function(lang, index) {
-  const command = `node_modules/pm2/bin/pm2 start worker.js -i ${lang === 'en' ? '4' : '2'} --name=videowiki_audio_processor_${lang} -- ${lang}` 
+  const command = `node_modules/pm2/bin/pm2 start worker.js -i ${lang === 'en' ? '2' : '1'} --name=videowiki_audio_processor_${lang} -- ${lang}` 
   setTimeout(() => {
     exec(command, (err, stdout) => {
       console.log(command);
